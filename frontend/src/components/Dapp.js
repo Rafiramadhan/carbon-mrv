@@ -62,6 +62,12 @@ export class Dapp extends React.Component {
     if (window.ethereum === undefined) {
       return <NoWalletDetected />;
     }
+    console.log('tokenData -->' , this.state.tokenData)
+    console.log('selectedAddress --> ', this.state.selectedAddress)
+    console.log('balance --> ', this.state.balance)
+    console.log('txBeingSent --> ', this.state.txBeingSent)
+    console.log('transactionError --> ', this.state.transactionError)
+    console.log('networkError --> ', this.state.networkError)
 
     // The next thing we need to do, is to ask the user to connect their wallet.
     // When the wallet gets connected, we are going to save the users's address
@@ -177,8 +183,10 @@ export class Dapp extends React.Component {
 
     // First we check the network
     this._checkNetwork();
+    console.log('this.checknetwork --> ', this._checkNetwork())
 
     this._initialize(selectedAddress);
+    console.log('this.initialize --> ', this._initialize(selectedAddress))
 
     // We reinitialize it whenever the user changes their account.
     window.ethereum.on("accountsChanged", ([newAddress]) => {
@@ -217,6 +225,8 @@ export class Dapp extends React.Component {
     // We first initialize ethers by creating a provider using window.ethereum
     this._provider = new ethers.providers.Web3Provider(window.ethereum);
 
+    console.log('provider --> ', this._provider)
+
     // Then, we initialize the contract using that provider and the token's
     // artifact. You can do this same thing with your contracts.
     this._token = new ethers.Contract(
@@ -250,12 +260,15 @@ export class Dapp extends React.Component {
   async _getTokenData() {
     const name = await this._token.name();
     const symbol = await this._token.symbol();
+    console.log('tokenName --> ', name)
+    console.log('tokenSymbol --> ', symbol)
 
     this.setState({ tokenData: { name, symbol } });
   }
 
   async _updateBalance() {
     const balance = await this._token.balanceOf(this.state.selectedAddress);
+    console.log('balance _updateBalance()--> ', balance)
     this.setState({ balance });
   }
 
@@ -346,6 +359,7 @@ export class Dapp extends React.Component {
 
   async _switchChain() {
     const chainIdHex = `0x${HARDHAT_NETWORK_ID.toString(16)}`
+    console.log('chainIdHex -->  ', chainIdHex)
     await window.ethereum.request({
       method: "wallet_switchEthereumChain",
       params: [{ chainId: chainIdHex }],
@@ -355,6 +369,7 @@ export class Dapp extends React.Component {
 
   // This method checks if the selected network is Localhost:8545
   _checkNetwork() {
+    console.log('ethereum.networkversion --> ', window.ethereum.networkVersion)
     if (window.ethereum.networkVersion !== HARDHAT_NETWORK_ID) {
       this._switchChain();
     }

@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+contract MultiSignature {
+    address public caller;
+    address public authority;
+    address[] public users;
+    mapping(address => bool) public signatures;
+
+    event SignatureAdded(address indexed signer);
+
+    constructor(address _authority, address[] memory _users) {
+        require(_users.length >= 5, "Invalid number of users");
+
+        caller = msg.sender;
+        authority = _authority;
+        users = _users;
+    }
+
+    function addSignature() external {
+        require(msg.sender == caller || msg.sender == authority, "Unauthorized signer");
+        require(!signatures[msg.sender], "Signature already added");
+
+        signatures[msg.sender] = true;
+        emit SignatureAdded(msg.sender);
+    }
+
+    function areSignaturesComplete() public view returns (bool) {
+        uint256 count = 0;
+
+        if (signatures[caller]) {
+            count++;
+        }
+
+        if (signatures[authority]) {
+            count++;
+        }
+
+        address[] memory selectedUsers = _selectRandomUsers(3);
+        for (uint256 i = 0; i < selectedUsers.length; i++) {
+            if (signatures[selectedUsers[i]]) {
+                count++;
+            }
+        }
+
+        return count >= 3;
+    }
+
+    function _selectRandomUsers(uint256 count) private view returns (address[] memory) {
+        require(count <= users.length, "Invalid count");
+
+        address[] memory selected = new address[](count);
+        address[] memory available = new address[](users.length);
+
+        for (uint256 i = 0; i < users.length; i++) {
+            available[i] = users[i];
+        }
+
+        for (uint256 i = 0; i < count; i++) {
+            uint256 index = _generateRandomNumber(i, available.length);
+            selected[i] = available[index];
+
+            available[index] = available[available.length - 1];
+            available.pop();
+        }
+
+        return selected;
+    }
+
+    function _generateRandomNumber(uint256 seed, uint256 max) private view returns (uint256) {
+        uint256 randomHash = uint256(keccak256(abi.encodePacked(block.difficulty, block.timestamp, seed)));
+        return randomHash % max;
+    }
+}
