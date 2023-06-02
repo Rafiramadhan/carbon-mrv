@@ -34,8 +34,9 @@ export interface ReportingInterface extends utils.Interface {
     "authority()": FunctionFragment;
     "docHashes(address)": FunctionFragment;
     "finishTransaction()": FunctionFragment;
-    "initialize(uint256,string)": FunctionFragment;
+    "initialize(uint256,string,uint256)": FunctionFragment;
     "isVerifierSelected()": FunctionFragment;
+    "mismatch(address)": FunctionFragment;
     "organization()": FunctionFragment;
     "rejectTransaction(string)": FunctionFragment;
     "rejectionMessage()": FunctionFragment;
@@ -45,7 +46,8 @@ export interface ReportingInterface extends utils.Interface {
     "transactionActive()": FunctionFragment;
     "transactionFinished()": FunctionFragment;
     "transactionRejected()": FunctionFragment;
-    "verifiers(uint256)": FunctionFragment;
+    "verifierAddresses(uint256)": FunctionFragment;
+    "verifiers(address)": FunctionFragment;
   };
 
   getFunction(
@@ -57,6 +59,7 @@ export interface ReportingInterface extends utils.Interface {
       | "finishTransaction"
       | "initialize"
       | "isVerifierSelected"
+      | "mismatch"
       | "organization"
       | "rejectTransaction"
       | "rejectionMessage"
@@ -66,6 +69,7 @@ export interface ReportingInterface extends utils.Interface {
       | "transactionActive"
       | "transactionFinished"
       | "transactionRejected"
+      | "verifierAddresses"
       | "verifiers"
   ): FunctionFragment;
 
@@ -88,11 +92,19 @@ export interface ReportingInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "initialize",
-    values: [PromiseOrValue<BigNumberish>, PromiseOrValue<string>]
+    values: [
+      PromiseOrValue<BigNumberish>,
+      PromiseOrValue<string>,
+      PromiseOrValue<BigNumberish>
+    ]
   ): string;
   encodeFunctionData(
     functionFragment: "isVerifierSelected",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "mismatch",
+    values: [PromiseOrValue<string>]
   ): string;
   encodeFunctionData(
     functionFragment: "organization",
@@ -131,8 +143,12 @@ export interface ReportingInterface extends utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "verifiers",
+    functionFragment: "verifierAddresses",
     values: [PromiseOrValue<BigNumberish>]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "verifiers",
+    values: [PromiseOrValue<string>]
   ): string;
 
   decodeFunctionResult(
@@ -154,6 +170,7 @@ export interface ReportingInterface extends utils.Interface {
     functionFragment: "isVerifierSelected",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "mismatch", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "organization",
     data: BytesLike
@@ -187,18 +204,73 @@ export interface ReportingInterface extends utils.Interface {
     functionFragment: "transactionRejected",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "verifierAddresses",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "verifiers", data: BytesLike): Result;
 
   events: {
+    "ConsoleLogaddress(address[])": EventFragment;
+    "ConsoleLogarray(string[])": EventFragment;
+    "ConsoleLogstring(string)": EventFragment;
+    "ConsoleLoguint256(uint256[])": EventFragment;
     "SignatureAdded(address)": EventFragment;
     "TransactionFinished()": EventFragment;
     "TransactionRejected(string)": EventFragment;
   };
 
+  getEvent(nameOrSignatureOrTopic: "ConsoleLogaddress"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "ConsoleLogarray"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "ConsoleLogstring"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "ConsoleLoguint256"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "SignatureAdded"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "TransactionFinished"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "TransactionRejected"): EventFragment;
 }
+
+export interface ConsoleLogaddressEventObject {
+  message: string[];
+}
+export type ConsoleLogaddressEvent = TypedEvent<
+  [string[]],
+  ConsoleLogaddressEventObject
+>;
+
+export type ConsoleLogaddressEventFilter =
+  TypedEventFilter<ConsoleLogaddressEvent>;
+
+export interface ConsoleLogarrayEventObject {
+  message: string[];
+}
+export type ConsoleLogarrayEvent = TypedEvent<
+  [string[]],
+  ConsoleLogarrayEventObject
+>;
+
+export type ConsoleLogarrayEventFilter = TypedEventFilter<ConsoleLogarrayEvent>;
+
+export interface ConsoleLogstringEventObject {
+  message: string;
+}
+export type ConsoleLogstringEvent = TypedEvent<
+  [string],
+  ConsoleLogstringEventObject
+>;
+
+export type ConsoleLogstringEventFilter =
+  TypedEventFilter<ConsoleLogstringEvent>;
+
+export interface ConsoleLoguint256EventObject {
+  message: BigNumber[];
+}
+export type ConsoleLoguint256Event = TypedEvent<
+  [BigNumber[]],
+  ConsoleLoguint256EventObject
+>;
+
+export type ConsoleLoguint256EventFilter =
+  TypedEventFilter<ConsoleLoguint256Event>;
 
 export interface SignatureAddedEventObject {
   signer: string;
@@ -277,12 +349,18 @@ export interface Reporting extends BaseContract {
     initialize(
       _reportedToken: PromiseOrValue<BigNumberish>,
       _docHash: PromiseOrValue<string>,
+      _storedUsage: PromiseOrValue<BigNumberish>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
     isVerifierSelected(
       overrides?: CallOverrides
     ): Promise<[boolean, string, BigNumber, string]>;
+
+    mismatch(
+      arg0: PromiseOrValue<string>,
+      overrides?: CallOverrides
+    ): Promise<[boolean]>;
 
     organization(overrides?: CallOverrides): Promise<[string]>;
 
@@ -314,10 +392,17 @@ export interface Reporting extends BaseContract {
 
     transactionRejected(overrides?: CallOverrides): Promise<[boolean]>;
 
-    verifiers(
+    verifierAddresses(
       arg0: PromiseOrValue<BigNumberish>,
       overrides?: CallOverrides
     ): Promise<[string]>;
+
+    verifiers(
+      arg0: PromiseOrValue<string>,
+      overrides?: CallOverrides
+    ): Promise<
+      [string, string] & { verifierAddress: string; verifierEmail: string }
+    >;
   };
 
   addSignature(
@@ -340,12 +425,18 @@ export interface Reporting extends BaseContract {
   initialize(
     _reportedToken: PromiseOrValue<BigNumberish>,
     _docHash: PromiseOrValue<string>,
+    _storedUsage: PromiseOrValue<BigNumberish>,
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
   isVerifierSelected(
     overrides?: CallOverrides
   ): Promise<[boolean, string, BigNumber, string]>;
+
+  mismatch(
+    arg0: PromiseOrValue<string>,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
 
   organization(overrides?: CallOverrides): Promise<string>;
 
@@ -377,10 +468,17 @@ export interface Reporting extends BaseContract {
 
   transactionRejected(overrides?: CallOverrides): Promise<boolean>;
 
-  verifiers(
+  verifierAddresses(
     arg0: PromiseOrValue<BigNumberish>,
     overrides?: CallOverrides
   ): Promise<string>;
+
+  verifiers(
+    arg0: PromiseOrValue<string>,
+    overrides?: CallOverrides
+  ): Promise<
+    [string, string] & { verifierAddress: string; verifierEmail: string }
+  >;
 
   callStatic: {
     addSignature(overrides?: CallOverrides): Promise<void>;
@@ -399,12 +497,18 @@ export interface Reporting extends BaseContract {
     initialize(
       _reportedToken: PromiseOrValue<BigNumberish>,
       _docHash: PromiseOrValue<string>,
+      _storedUsage: PromiseOrValue<BigNumberish>,
       overrides?: CallOverrides
-    ): Promise<void>;
+    ): Promise<[string, string]>;
 
     isVerifierSelected(
       overrides?: CallOverrides
     ): Promise<[boolean, string, BigNumber, string]>;
+
+    mismatch(
+      arg0: PromiseOrValue<string>,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
     organization(overrides?: CallOverrides): Promise<string>;
 
@@ -436,13 +540,36 @@ export interface Reporting extends BaseContract {
 
     transactionRejected(overrides?: CallOverrides): Promise<boolean>;
 
-    verifiers(
+    verifierAddresses(
       arg0: PromiseOrValue<BigNumberish>,
       overrides?: CallOverrides
     ): Promise<string>;
+
+    verifiers(
+      arg0: PromiseOrValue<string>,
+      overrides?: CallOverrides
+    ): Promise<
+      [string, string] & { verifierAddress: string; verifierEmail: string }
+    >;
   };
 
   filters: {
+    "ConsoleLogaddress(address[])"(
+      message?: null
+    ): ConsoleLogaddressEventFilter;
+    ConsoleLogaddress(message?: null): ConsoleLogaddressEventFilter;
+
+    "ConsoleLogarray(string[])"(message?: null): ConsoleLogarrayEventFilter;
+    ConsoleLogarray(message?: null): ConsoleLogarrayEventFilter;
+
+    "ConsoleLogstring(string)"(message?: null): ConsoleLogstringEventFilter;
+    ConsoleLogstring(message?: null): ConsoleLogstringEventFilter;
+
+    "ConsoleLoguint256(uint256[])"(
+      message?: null
+    ): ConsoleLoguint256EventFilter;
+    ConsoleLoguint256(message?: null): ConsoleLoguint256EventFilter;
+
     "SignatureAdded(address)"(
       signer?: PromiseOrValue<string> | null
     ): SignatureAddedEventFilter;
@@ -480,10 +607,16 @@ export interface Reporting extends BaseContract {
     initialize(
       _reportedToken: PromiseOrValue<BigNumberish>,
       _docHash: PromiseOrValue<string>,
+      _storedUsage: PromiseOrValue<BigNumberish>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
     isVerifierSelected(overrides?: CallOverrides): Promise<BigNumber>;
+
+    mismatch(
+      arg0: PromiseOrValue<string>,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     organization(overrides?: CallOverrides): Promise<BigNumber>;
 
@@ -515,8 +648,13 @@ export interface Reporting extends BaseContract {
 
     transactionRejected(overrides?: CallOverrides): Promise<BigNumber>;
 
-    verifiers(
+    verifierAddresses(
       arg0: PromiseOrValue<BigNumberish>,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    verifiers(
+      arg0: PromiseOrValue<string>,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
   };
@@ -544,10 +682,16 @@ export interface Reporting extends BaseContract {
     initialize(
       _reportedToken: PromiseOrValue<BigNumberish>,
       _docHash: PromiseOrValue<string>,
+      _storedUsage: PromiseOrValue<BigNumberish>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 
     isVerifierSelected(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    mismatch(
+      arg0: PromiseOrValue<string>,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
@@ -585,8 +729,13 @@ export interface Reporting extends BaseContract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    verifiers(
+    verifierAddresses(
       arg0: PromiseOrValue<BigNumberish>,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    verifiers(
+      arg0: PromiseOrValue<string>,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
   };

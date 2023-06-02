@@ -35,13 +35,28 @@ async function main() {
   await monitoring.deployed();
 
   const Reporting = await ethers.getContractFactory("Reporting");
-  const reporting = await Reporting.deploy([
-    "0x976EA74026E726554dB657fA54763abd0C3a0aa9",
-    "0x14dC79964da2C08b23698B3D3cc7Ca32193d9955",
-    "0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f",
-    "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
-    "0xBcd4042DE499D14e55001CcbB24a551F3b954096",
-  ]);
+  const reporting = await Reporting.deploy(
+    [
+      "0x976EA74026E726554dB657fA54763abd0C3a0aa9",
+      "0x14dC79964da2C08b23698B3D3cc7Ca32193d9955",
+      "0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f",
+      "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+      "0xBcd4042DE499D14e55001CcbB24a551F3b954096",
+      "0x71bE63f3384f5fb98995898A86B02Fb2426c5788",
+      "0xFABB0ac9d68B0B445fB7357272Ff202C5651694a",
+      "0x1CBd3b2770909D4e10f157cABC84C7264073C9Ec",
+    ],
+    [
+      "rafi.ramadhan27@gmail.com",
+      "rafi.ramadhan27+9955@gmail.com",
+      "rafi.ramadhan27+1E8f@gmail.com",
+      "rafi.ramadhan27+9720@gmail.com",
+      "rafi.ramadhan27+4096@gmail.com",
+      "rafi.ramadhan27+5788@gmail.com",
+      "rafi.ramadhan27+694a@gmail.com",
+      "rafi.ramadhan27+C9Ec@gmail.com",
+    ]
+  );
   await reporting.deployed();
 
   console.log("Monitoring address:", monitoring.address);
@@ -82,20 +97,35 @@ async function main() {
 // }
 
 function saveFrontendFiles(contract: any, contractName: string) {
-  const contractsDir = path.join(__dirname, "..", "frontend", "src", "contracts");
+  const contractsDir = path.join(
+    __dirname,
+    "..",
+    "frontend",
+    "src",
+    "contracts"
+  );
   if (!fs.existsSync(contractsDir)) {
     fs.mkdirSync(contractsDir);
   }
-  const contractAddressFilePath = path.join(contractsDir, "contract-address.json");
+  const contractAddressFilePath = path.join(
+    contractsDir,
+    "contract-address.json"
+  );
   let contractAddresses = {};
   if (fs.existsSync(contractAddressFilePath)) {
     const existingData = fs.readFileSync(contractAddressFilePath, "utf-8");
     contractAddresses = JSON.parse(existingData);
   }
   contractAddresses[contractName] = contract.address;
-  fs.writeFileSync(contractAddressFilePath, JSON.stringify(contractAddresses, undefined, 2));
+  fs.writeFileSync(
+    contractAddressFilePath,
+    JSON.stringify(contractAddresses, undefined, 2)
+  );
   const TokenArtifact = artifacts.readArtifactSync(contractName);
-  fs.writeFileSync(path.join(contractsDir, `${contractName}.json`), JSON.stringify(TokenArtifact, null, 2));
+  fs.writeFileSync(
+    path.join(contractsDir, `${contractName}.json`),
+    JSON.stringify(TokenArtifact, null, 2)
+  );
 }
 
 main()

@@ -375,3 +375,5 @@ export class Dapp extends React.Component {
     }
   }
 }
+
+export default Dapp;

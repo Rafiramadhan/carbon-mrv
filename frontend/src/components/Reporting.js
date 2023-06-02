@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate, withRouter } from 'react-router-dom'
-import { ethers, BigNumber } from 'ethers';
+import React, { useEffect, useState, useRef } from "react";
+import { useNavigate, withRouter } from "react-router-dom";
+import { ethers, BigNumber } from "ethers";
 
 // We import the contract's artifacts and address here, as we are going to be
 // using them with ethers
 import TokenArtifact from "../contracts/Token.json";
-import MonitoringArtifact from "../contracts/Monitoring.json"
+import MonitoringArtifact from "../contracts/Monitoring.json";
+import ReportingArtifact from "../contracts/Reporting.json";
 import contractAddress from "../contracts/contract-address.json";
 
 // All the logic of this dapp is contained in the Dapp component.
@@ -18,9 +19,10 @@ import { Transfer } from "./Transfer";
 import { TransactionErrorMessage } from "./TransactionErrorMessage";
 import { WaitingForTransactionMessage } from "./WaitingForTransactionMessage";
 import { NoTokensMessage } from "./NoTokensMessage";
+import AWS from "aws-sdk";
 
 // This is the default id used by the Hardhat Network
-const HARDHAT_NETWORK_ID = '31337';
+const HARDHAT_NETWORK_ID = "31337";
 
 // This is an error code that indicates that the user canceled a transaction
 const ERROR_CODE_TX_REJECTED_BY_USER = 4001;
@@ -42,8 +44,9 @@ export class Monitoring extends React.Component {
       transactionError: undefined,
       networkError: undefined,
       usageData: undefined,
-      message: '',
-      selectedYear: new Date().getFullYear() 
+      selectedVerifier: { email: [], address: [] },
+      message: "",
+      selectedYear: new Date().getFullYear(),
     };
 
     this.state = this.initialState;
@@ -55,24 +58,84 @@ export class Monitoring extends React.Component {
   handleFileUpload = async (event) => {
     event.preventDefault();
     const file = event.target.files[0];
+    console.log('here')
 
     if (file) {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const csvContent = e.target.result;
         const usageValue = this.processCsvData(csvContent);
-        this._insertUsage(usageValue)
 
-        this.setState({
-          message: `File upload success, the value is ${usageValue}, redirecting back in 5, 4, 3, 2, 1`
+        const s3 = new AWS.S3({
+          accessKeyId: "AKIA4B3U32MEM74C3AUM",
+          secretAccessKey: "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",
+          region: "ap-southeast-1",
         });
 
-        setTimeout(() => {
+        const uploadParams = {
+          Bucket: "emission-report",
+          Key: file.name,
+          Body: file,
+        };
+
+        console.log("s3 --> ", s3);
+        console.log("uploadParams --> ", uploadParams);
+        try {
+          const uploadedFile = await s3.upload(uploadParams).promise();
+          console.log("File uploaded successfully.");
+
+          console.log(
+            "this.state.selectedAddress --> ",
+            this.state.selectedAddress,
+            this.state.usageData.year
+          );
+          const balance = await this._monitoringContract.getTotalCapByYear(
+            this.state.selectedAddress,
+            this.state.usageData.year
+          );
+          const downloadLink = `https://${uploadParams.Bucket}.s3.${s3.config.region}.amazonaws.com/${file.name}`;
+          console.log("Download link:", downloadLink);
+          console.log("uploadedFile --> ", uploadedFile);
+          console.log("uploadedFile --> ", uploadedFile.Location);
+
+          const hexedUsage = balance.toHexString();
+          const storedUsage = parseInt(hexedUsage, 16);
+          console.log("storedUsage --> ", storedUsage);
+          // await this._contract.initialize(usageValue, "test1234", storedUsage);
+
+          // this._contract.on("ConsoleLogaddress", (address) => {
+          //   this.setState((prevState) => ({
+          //     selectedVerifier: {
+          //       ...prevState.selectedVerifier,
+          //       address: [...prevState.selectedVerifier.address, address],
+          //     },
+          //   }));
+          // });
+          // this._contract.on("ConsoleLogarray", (email) => {
+          //   this.setState((prevState) => ({
+          //     selectedVerifier: {
+          //       ...prevState.selectedVerifier,
+          //       email: [...prevState.selectedVerifier.email, email],
+          //     },
+          //   }));
+          // });
+
+          console.log("verifiers --> ", this.state.selectedVerifiers);
+
           this.setState({
-            message: ''
+            message: `File upload success, the value is ${usageValue}, redirecting back in 5, 4, 3, 2, 1`,
           });
-          this.fileUpload.current.reset();
-        }, 5000);
+
+          setTimeout(() => {
+            this.setState({
+              message: "",
+            });
+            this.fileUpload.current.reset();
+          }, 5000);
+        } catch (error) {
+          console.log('error --> ', error)
+          console.error("Error uploading file:", error);
+        }
       };
 
       reader.readAsText(file);
@@ -84,33 +147,43 @@ export class Monitoring extends React.Component {
     await this._updateUsage(year);
   };
 
+  getVerifier = async (event) => {
+    event.preventDefault();
+    await this._updateSelectedVerifier();
+  };
+
+  cancelReport = async (event) => {
+    event.preventDefault();
+    await this._cancelReport();
+  };
+
   handleYearChange = (event) => {
     const year = parseInt(event.target.value); // Parse the input value as an integer
     this.setState({ selectedYear: year }); // Update the selectedYear state
   };
 
   processCsvData = (csvContent) => {
-    const lines = csvContent.split('\n');
-    let usage = '';
-  
+    const lines = csvContent.split("\n");
+    let usage = "";
+
     if (lines.length > 1) {
-      const headerLine = lines[0] ? lines[0].trim() : '';
-      const headerColumns = headerLine.split(',');
-  
-      const usageColumnIndex = headerColumns.findIndex((column) =>
-        column.toLowerCase().trim() === 'usage'
+      const headerLine = lines[0] ? lines[0].trim() : "";
+      const headerColumns = headerLine.split(",");
+
+      const usageColumnIndex = headerColumns.findIndex(
+        (column) => column.toLowerCase().trim() === "usage"
       );
-  
+
       if (usageColumnIndex !== -1) {
-        const dataLine = lines[1] ? lines[1].trim() : '';
-        const dataColumns = dataLine.split(',');
-  
+        const dataLine = lines[1] ? lines[1].trim() : "";
+        const dataColumns = dataLine.split(",");
+
         if (dataColumns.length > usageColumnIndex) {
           usage = dataColumns[usageColumnIndex].trim();
         }
       }
     }
-  
+
     return usage;
   };
 
@@ -120,12 +193,18 @@ export class Monitoring extends React.Component {
     }
     if (!this.state.selectedAddress) {
       return (
-        <ConnectWallet 
-          connectWallet={() => this._connectWallet()} 
+        <ConnectWallet
+          connectWallet={() => this._connectWallet()}
           networkError={this.state.networkError}
           dismiss={() => this._dismissNetworkError()}
         />
       );
+    }
+    if (
+      !this.state.selectedVerifier.email &&
+      !this.state.selectedVerifier.address
+    ) {
+      return <Loading />;
     }
     // if (this.state.usageData !== undefined || this.state.usageData.usage !== undefined) {
     //   // console.log('this.state --> ', this.state.usageData)
@@ -135,46 +214,85 @@ export class Monitoring extends React.Component {
     else {
       return (
         <div className="container">
-        <div className="row justify-content-md-center">
-          <div className="col-12 p-4 text-center">
-            <div className="col-12">
-              <h1>
-                {/* {this.state.tokenData.name} ({this.state.tokenData.symbol}) */}
-              </h1>
-              <p>
+          <div className="row justify-content-md-center">
+            <div className="col-12 p-4 text-center">
+              <div className="col-12">
+                <h1>
+                  {/* {this.state.tokenData.name} ({this.state.tokenData.symbol}) */}
+                </h1>
                 <p>
-                Welcome <b>{this.state.selectedAddress}</b> 
-                </p>
-                <p>
-                  this <b>{this.state.usageData.year ? this.state.usageData.year : new Date().getFullYear} </b>
-                  You already use <b>{this.state.usageData.usage ? this.state.usageData.usage : "0"}</b>
-                </p>
-                <b>
-                  {/* {this.state.balance.toString()} {this.state.tokenData.symbol} */}
-                </b>
-                <div>
+                  <p>
+                    Welcome <b>{this.state.selectedAddress}</b>
+                  </p>
+                  <p>
+                    this{" "}
+                    <b>
+                      {this.state.usageData.year
+                        ? this.state.usageData.year
+                        : new Date().getFullYear}{" "}
+                    </b>
+                    You already use{" "}
+                    <b>
+                      {this.state.usageData.usage
+                        ? this.state.usageData.usage
+                        : "0"}
+                    </b>
+                  </p>
+                  <b>
+                    {/* {this.state.balance.toString()} {this.state.tokenData.symbol} */}
+                  </b>
                   <div>
-                    <label htmlFor="yearInput">Year : </label>
-                    <input
-                      type="number"
-                      id="yearInput"
-                      defaultValue={this.state.selectedYear}
-                      onChange={this.handleYearChange}
-                    />
+                    <div>
+                      <label htmlFor="yearInput">Year : </label>
+                      <input
+                        type="number"
+                        id="yearInput"
+                        defaultValue={this.state.selectedYear}
+                        onChange={this.handleYearChange}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(event) =>
+                        this.getUsage(event, this.state.selectedYear)
+                      }
+                    >
+                      Refresh
+                    </button>
                   </div>
-                  <button type="button" onClick={(event) => this.getUsage(event, this.state.selectedYear)}>Refresh</button>
+                </p>
+              </div>
+              <h1>Upload Emission Report</h1>
+              {this.state.message && <p>{this.state.message}</p>}
+              <form ref={this.fileUpload}>
+                <div className="text-center">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={this.handleFileUpload}
+                  />
                 </div>
-              </p>
+              </form>
+              <button
+                type="button"
+                onClick={(event) => this.getVerifier(event)}
+              >
+                getVerifier
+              </button>
+              <button
+                type="button"
+                onClick={(event) => this.cancelReport(event)}
+              >
+                cancelReport
+              </button>
+              {/* You already use{" "}
+              <b>
+                {this.state.selectedVerifier.address
+                  ? this.state.selectedVerifier.address
+                  : "empty"}
+              </b> */}
             </div>
-          <h1>Upload Emission Usage</h1>
-          {this.state.message && <p>{this.state.message}</p>}
-          <form ref={this.fileUpload}>
-            <div className="text-center">
-            <input type="file" accept=".csv" onChange={this.handleFileUpload} />
-            </div>
-          </form>
           </div>
-        </div>
         </div>
       );
     }
@@ -191,7 +309,9 @@ export class Monitoring extends React.Component {
 
     // To connect to the user's wallet, we have to run this method.
     // It returns a promise that will resolve to the user's address.
-    const [selectedAddress] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const [selectedAddress] = await window.ethereum.request({
+      method: "eth_requestAccounts",
+    });
 
     // Once we have the address, we can initialize the application.
 
@@ -205,11 +325,11 @@ export class Monitoring extends React.Component {
       // `accountsChanged` event can be triggered with an undefined newAddress.
       // This happens when the user removes the Dapp from the "Connected
       // list of sites allowed access to your addresses" (Metamask > Settings > Connections)
-      // To avoid errors, we reset the dapp state 
+      // To avoid errors, we reset the dapp state
       if (newAddress === undefined) {
         return this._resetState();
       }
-      
+
       this._initialize(newAddress);
     });
   }
@@ -239,11 +359,17 @@ export class Monitoring extends React.Component {
     // Then, we initialize the contract using that provider and the token's
     // artifact. You can do this same thing with your contracts.
     this._contract = new ethers.Contract(
+      contractAddress.Reporting,
+      ReportingArtifact.abi,
+      this._provider.getSigner(0)
+    );
+    this._monitoringContract = new ethers.Contract(
       contractAddress.Monitoring,
       MonitoringArtifact.abi,
       this._provider.getSigner(0)
     );
-    console.log('this._contract --> ', this._contract)
+    console.log("this._contract --> ", this._contract);
+    console.log("this._monitoringContract --> ", this._monitoringContract);
   }
 
   // The next two methods are needed to start and stop polling data. While
@@ -265,28 +391,69 @@ export class Monitoring extends React.Component {
     this._pollDataInterval = undefined;
   }
 
-  async _updateUsage(year=new Date().getFullYear()) {
-    const balance = await this._contract.getTotalCapByYear(this.state.selectedAddress, year);
-    const hexedUsage = balance.toHexString()
-    const usage = parseInt(hexedUsage, 16)
-    this.setState({ usageData: {year, usage}  });
+  async _updateUsage(year = new Date().getFullYear()) {
+    const balance = await this._contract.getTotalCapByYear(
+      this.state.selectedAddress,
+      year
+    );
+    const hexedUsage = balance.toHexString();
+    const usage = parseInt(hexedUsage, 16);
+    this.setState({ usageData: { year, usage } });
   }
 
-  async _insertUsage(usage){
-    const balance = await this._contract.insertData(this.state.selectedAddress, usage, new Date().getFullYear());
-    this._updateUsage()
+  async _cancelReport() {
+    const balance = await this._contract.rejectTransaction("canceled");
   }
 
-  async _getUsageData(year=new Date().getFullYear()){
+  async _updateSelectedVerifier() {
+    console.log(
+      "this.state.selectedVerifier --> ",
+      this.state.selectedVerifier
+    );
+  }
+
+  async _insertUsage(usage) {
+    const balance = await this._contract.insertData(
+      this.state.selectedAddress,
+      usage,
+      new Date().getFullYear()
+    );
+    this._updateUsage();
+  }
+
+  async _getUsageData(year = new Date().getFullYear()) {
     let usage = 0;
-    const balance = this.state.selectedAddress ? await this._contract.getTotalCapByYear(this.state.selectedAddress, year) : {};
-    if(this.state.selectedAddress) {
-      const balance = await this._contract.getTotalCapByYear(this.state.selectedAddress, year)
-      const hexedUsage = balance.toHexString()
-      usage = parseInt(hexedUsage, 16)
-      this.setState({ usageData: {year, usage}  });
+    const balance = this.state.selectedAddress
+      ? await this._contract.getTotalCapByYear(this.state.selectedAddress, year)
+      : {};
+    if (this.state.selectedAddress) {
+      const balance = await this._contract.getTotalCapByYear(
+        this.state.selectedAddress,
+        year
+      );
+      const hexedUsage = balance.toHexString();
+      usage = parseInt(hexedUsage, 16);
+      this.setState({ usageData: { year, usage } });
     } else {
-      this.setState({usageData: {year, usage}})
+      this.setState({ usageData: { year, usage } });
+    }
+  }
+
+  async _getUsageDataById(
+    year = new Date().getFullYear(),
+    userId = this.state.selectedAddress
+  ) {
+    let usage = 0;
+    const balance = this.state.selectedAddress
+      ? await this._contract.getTotalCapByYear(this.state.selectedAddress, year)
+      : {};
+    if (this.state.selectedAddress) {
+      const balance = await this._contract.getTotalCapByYear(userId, year);
+      const hexedUsage = balance.toHexString();
+      usage = parseInt(hexedUsage, 16);
+      this.setState({ usageData: { year, usage } });
+    } else {
+      this.setState({ usageData: { year, usage } });
     }
   }
 
@@ -376,7 +543,7 @@ export class Monitoring extends React.Component {
   }
 
   async _switchChain() {
-    const chainIdHex = `0x${HARDHAT_NETWORK_ID.toString(16)}`
+    const chainIdHex = `0x${HARDHAT_NETWORK_ID.toString(16)}`;
     await window.ethereum.request({
       method: "wallet_switchEthereumChain",
       params: [{ chainId: chainIdHex }],

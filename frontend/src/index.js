@@ -8,22 +8,27 @@ import { Monitoring } from "./components/Monitoring"
 
 // We import bootstrap here, but you can remove if you want
 import "bootstrap/dist/css/bootstrap.css";
+import reactDom from "react-dom";
+import App from "./App";
 
 // This is the entry point of your application, but it just renders the Dapp
 // react component. All of the logic is contained in it.
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
+// reactDom.render(<App />, document.getElementById('root'));
+
 root.render(
   <React.StrictMode>
-    <Dapp />
+    {/* <Dapp /> */}
     {/* <Monitoring /> */}
+    <App/>
   </React.StrictMode>
 );
 
 // ReactDOM.render(
 //   <Router>
-//     <Route path="/monitoring" component={MonitoringApp}/>
+//     <Route path="/monitoring" component={App}/>
 //   </Router>
 // )
 // ReactDOM.render(
